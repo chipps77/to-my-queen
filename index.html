@@ -105,6 +105,34 @@ canvas{display:block;width:100%;height:min(64vh,520px);min-height:300px;touch-ac
 .help{font-size:13px;color:var(--ink);opacity:.75;text-align:center;flex:1;min-width:0;letter-spacing:.02em}
 .help kbd{font:inherit;font-size:12px;background:var(--cream);border-radius:6px;padding:1px 7px;box-shadow:0 1px 0 rgba(150,95,0,.3)}
 @media (hover:hover) and (pointer:fine){.pads{display:none}.controls{justify-content:center}}
+@media not ((hover:hover) and (pointer:fine)){.help{display:none!important}}
+/* 手機直式：畫面改矮一點，讓遊戲看得到更寬的範圍、字不會被切掉 */
+@media (orientation:portrait) and (max-width:700px){
+  body{padding-block:12px 18px}
+  .wrap{gap:10px}
+  canvas{height:clamp(300px,calc((100vw - 48px)*1.2),64vh)}
+  header{flex-wrap:nowrap;align-items:center}
+  h1{font-size:clamp(22px,7.4vw,30px);padding:4px 2px 6px}
+  .chip{padding:7px 12px;flex-shrink:0}
+  .sign{position:fixed;inset:0;border-radius:0;z-index:30;background:rgba(60,40,25,.45)}
+  .hud{top:14px;left:14px;font-size:12px;max-width:calc(100% - 28px)}
+  .hud span{padding:2px 8px}
+  .toast{top:58px;font-size:13px}
+  .pad{width:58px;height:54px}.pad.jump{width:80px}
+  .lyrics{height:76px}
+}
+/* 手機橫式：螢幕很矮，畫面撐滿高度 */
+@media (orientation:landscape) and (max-height:500px){
+  body{padding-block:8px 10px}
+  .wrap{gap:8px}
+  header h1{font-size:24px;padding:2px 4px}
+  canvas{height:calc(100dvh - 150px);min-height:200px}
+  .pad{height:48px}
+  .sign{position:fixed;inset:0;border-radius:0;z-index:30;background:rgba(60,40,25,.45);place-items:start center;overflow:auto}
+  .board-clip{margin-block:14px}
+  .slip dl{margin-bottom:6px}
+  .lyrics{height:56px}
+}
 .modal{position:fixed;inset:0;background:rgba(60,40,25,.48);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;z-index:20;overflow:auto;
   padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .card{background:var(--cream);border-radius:18px;padding:26px 22px 22px;width:min(400px,100%);
@@ -1013,7 +1041,7 @@ addEventListener('keyup',e=>{if(tapMode&&e.key===' '&&!(e.target instanceof HTML
 setInterval(()=>{if(tapMode)$('tapTime').textContent=fmtT(bgm.currentTime)},100);
 /* ---------- background music ---------- */
 const bgm=new Audio();const bgmSrc=()=>{if(!bgm.src){const el=document.getElementById('bgmData');if(el)bgm.src=el.textContent.trim()}};document.addEventListener('DOMContentLoaded',bgmSrc);bgm.loop=true;bgm.preload='auto';bgm.volume=0;let bgmFading=false,bgmWanted=false,notes=[],noteT=0;
-function unlockBgm(){bgmSrc();try{const p=bgm.play();if(p)p.then(()=>{if(!bgmWanted)bgm.pause()}).catch(()=>{})}catch(e){}}
+function unlockBgm(){bgmSrc();if(bgmWanted)return;const done=()=>{if(!bgmWanted){bgm.pause();try{bgm.currentTime=0}catch(e){}}bgm.muted=!soundOn};try{bgm.muted=true;const p=bgm.play();if(p)p.then(done).catch(()=>{bgm.muted=!soundOn});else done()}catch(e){bgm.muted=!soundOn}}
 function startBgm(){bgmSrc();bgmWanted=true;bgm.muted=!soundOn;bgm.volume=0;const st=Math.max(0,LY[0].t-3);
   const seek=()=>{try{bgm.currentTime=st}catch(e){}};if(bgm.readyState>=1)seek();else bgm.addEventListener('loadedmetadata',seek,{once:true});
   lyLast=-1;lyPrevT=st;try{const p=bgm.play();if(p)p.catch(()=>{})}catch(e){}
@@ -1044,7 +1072,7 @@ function afterIntro(){if(!IN.on)return;IN.on=false;$('signBox').hidden=true;star
   P.x=80;P.y=-90;P.vx=0;P.vy=0;seedTrail();IN.drop=true;cam=0;hud();
   setTimeout(()=>toast('嗨 Anna！歡迎來到紙片王國。從爬爬走開始，每一站答對一題就長大一點'),900)}
 function tgeo(){const cx=VW/2,cy=H/2+18,BW=Math.min(VW-80,500),BH=Math.min(270,BW*.58);return{cx,cy,BW,BH,bx:cx-BW/2,by:cy-BH/2}}
-function introStep(dt){IN.t+=dt;const g=tgeo();
+function introStep(dt){IN.t+=dt;const g=tgeo();if(!bgmWanted&&!bgm.paused&&!bgm.muted&&!modalOpen)bgm.pause();
   if(IN.st==='cal'){const nx=Math.min(18,Math.max(0,Math.floor((IN.t-40)/18)));if(nx>IN.xs){IN.xs=nx;tone([300+nx*25],.03,'triangle')}
     if(IN.t>40+18*18+40){IN.st='calsay';IN.t=0}}
   if(IN.st==='calsay'&&IN.t>150){IN.st='door';IN.t=0;IN.boxY=-320;IN.boxV=0;IN.landed=false;IN.flash=.9}
@@ -1305,6 +1333,8 @@ function loop(now){const dt=Math.min(2.5,(now-last)/16.67);last=now;if(OUT.on){c
   if(!IN.on&&IN.flash>0)IN.flash=Math.max(0,IN.flash-dt/35);
   if(SC.on)sceneStep(dt);stepSp(dt);uiNear();lyTick();
   draw();requestAnimationFrame(loop)}
+{const fit=(orig)=>function(t,x,y,mw){const lim=VW-16;if(mw===undefined&&typeof t==='string'&&t.length>1){const w=this.measureText(t).width;if(w>lim)return orig.call(this,t,x,y,lim)}return mw===undefined?orig.call(this,t,x,y):orig.call(this,t,x,y,mw)};
+ const CP=CanvasRenderingContext2D.prototype;CP.fillText=fit(CP.fillText);CP.strokeText=fit(CP.strokeText)}
 build();resize();setSize();renderSlice();hud();requestAnimationFrame(loop);
 })();
 </script>
